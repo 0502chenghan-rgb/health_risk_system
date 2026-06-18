@@ -3,8 +3,8 @@
 這是計算機概論的期末專案作業。本專案是一個基於 Python Flask 框架開發的網頁系統，結合了決策樹演算法來評估個人的健康風險。
 
 ## 🌐 相關連結
-* **線上展示網址 (Render):https://health-risk-system-40pn.onrender.com
-* **程式碼儲存庫 (GitHub):https://github.com/0502chenghan-rgb/health_risk_system
+* 線上展示網址 (Render):https://health-risk-system-40pn.onrender.com
+* 程式碼儲存庫 (GitHub):https://github.com/0502chenghan-rgb/health_risk_system
 
 ## ✨ 主要功能
 * **風險評估問卷：** 使用者可以輸入相關健康數據（如身高、體重、生活習慣等）。
