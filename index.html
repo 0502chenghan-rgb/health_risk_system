@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧健康日誌與風險評估系統</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400 mb-2">
+                智慧健康日誌與風險評估系統
+            </h1>
+            <p class="text-slate-400 text-sm">課堂專案：基於決策樹演算法 (Decision Tree C4.5 Principles)</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="md:col-span-1 bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 h-fit">
+                <h2 id="formTitle" class="text-xl font-bold text-cyan-400 mb-4">📝 記錄今日健康</h2>
+                
+                <form id="logForm" class="space-y-4">
+                    <input type="hidden" id="edit_id" value="">
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">紀錄日期</label>
+                        <input type="date" id="log_date" required class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-400 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">睡眠時數 (小時)</label>
+                        <input type="number" step="0.1" id="sleep_hours" placeholder="e.g. 7.5" required class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-400 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">當日步數</label>
+                        <input type="number" id="steps" placeholder="e.g. 8000" required class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-400 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">心情分數 (1~10分)</label>
+                        <input type="number" min="1" max="10" id="mood_score" placeholder="10分代表極佳" required class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2.5 text-white focus:outline-none focus:border-cyan-400 text-sm">
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-700">
+                        <span class="block text-xs font-semibold text-slate-400 mb-2">決策樹即時判定結果：</span>
+                        <div id="liveBadge" class="w-full py-2 text-center rounded-xl font-bold text-sm bg-slate-700 text-slate-300">
+                            請輸入數據...
+                        </div>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="w-full bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-900 font-bold p-3 rounded-xl transition duration-200 hover:opacity-90 active:scale-95 text-sm cursor-pointer shadow-lg shadow-cyan-500/10">
+                        儲存日誌並寫入資料庫
+                    </button>
+                    
+                    <button type="button" id="cancelEditBtn" onclick="resetForm()" class="hidden w-full bg-slate-700 hover:bg-slate-600 text-white font-medium p-2 rounded-xl transition text-xs cursor-pointer mt-2">
+                        取消修改
+                    </button>
+                </form>
+            </div>
+
+            <div class="md:col-span-2 bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+                <h2 class="text-xl font-bold text-emerald-400 mb-4">📊 過去 90 天健康歷史趨勢</h2>
+                <div class="overflow-x-auto max-h-[500px] overflow-y-auto border border-slate-700 rounded-xl">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-900 text-slate-400 sticky top-0 uppercase font-semibold text-xs border-b border-slate-700">
+                            <tr>
+                                <th class="p-3">日期</th>
+                                <th class="p-3">睡眠時數</th>
+                                <th class="p-3">步數</th>
+                                <th class="p-3">心情</th>
+                                <th class="p-3 text-center">風險等級</th>
+                                <th class="p-3 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logTableBody" class="divide-y divide-slate-700/50">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 設定今日日期預設值
+        document.getElementById('log_date').value = new Date().toISOString().split('T')[0];
+
+        // 監聽輸入框變動，觸發即時決策樹 API 預估
+        const inputs = ['sleep_hours', 'steps', 'mood_score'];
+        inputs.forEach(id => {
+            document.getElementById(id).addEventListener('input', updateLiveRisk);
+        });
+
+        async function updateLiveRisk() {
+            const sleep = document.getElementById('sleep_hours').value;
+            const steps = document.getElementById('steps').value;
+            const mood = document.getElementById('mood_score').value;
+
+            if (sleep && steps && mood) {
+                const res = await fetch(`/health-logs/risk?sleep=${sleep}&steps=${steps}&mood=${mood}`);
+                const data = await res.json();
+                const badge = document.getElementById('liveBadge');
+                badge.innerText = data.risk_level;
+                
+                if(data.risk_level === '高風險') {
+                    badge.className = "w-full py-2 text-center rounded-xl font-bold text-sm bg-rose-500/20 text-rose-400 border border-rose-500/30";
+                } else if(data.risk_level === '中風險') {
+                    badge.className = "w-full py-2 text-center rounded-xl font-bold text-sm bg-amber-500/20 text-amber-400 border border-amber-500/30";
+                } else {
+                    badge.className = "w-full py-2 text-center rounded-xl font-bold text-sm bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                }
+            }
+        }
+
+        // 全域陣列，用來暫存下載下來的紀錄，方便點擊編輯時快速查資料
+        let currentLogs = [];
+
+        // 讀取歷史日誌列表
+        async function fetchLogs() {
+            const res = await fetch('/health-logs');
+            currentLogs = await res.json();
+            const tbody = document.getElementById('logTableBody');
+            tbody.innerHTML = '';
+
+            currentLogs.forEach(log => {
+                let badgeClass = "bg-slate-700 text-slate-300";
+                if (log.risk_level === '高風險') badgeClass = "bg-rose-500/20 text-rose-400 border border-rose-500/30";
+                else if (log.risk_level === '中風險') badgeClass = "bg-amber-500/20 text-amber-400 border border-amber-500/30";
+                else if (log.risk_level === '低風險') badgeClass = "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 transition duration-150">
+                        <td class="p-3 font-medium text-slate-300">${log.log_date}</td>
+                        <td class="p-3">${log.sleep_hours} 小時</td>
+                        <td class="p-3">${log.steps.toLocaleString()} 步</td>
+                        <td class="p-3">${log.mood_score} 分</td>
+                        <td class="p-3 text-center">
+                            <span class="px-2.5 py-1 rounded-full text-xs font-bold border ${badgeClass}">
+                                ${log.risk_level}
+                            </span>
+                        </td>
+                        <td class="p-3 text-center space-x-2">
+                            <button onclick="startEdit(${log.id})" class="text-xs font-bold text-cyan-400 hover:text-cyan-300 cursor-pointer transition">編輯</button>
+                            <span class="text-slate-600">|</span>
+                            <button onclick="deleteLog(${log.id})" class="text-xs font-bold text-rose-400 hover:text-rose-300 cursor-pointer transition">刪除</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // 🌟 觸發編輯狀態：將歷史資料填回左側表單
+        function startEdit(id) {
+            const log = currentLogs.find(l => l.id === id);
+            if (!log) return;
+
+            document.getElementById('edit_id').value = log.id;
+            document.getElementById('log_date').value = log.log_date;
+            document.getElementById('sleep_hours').value = log.sleep_hours;
+            document.getElementById('steps').value = log.steps;
+            document.getElementById('mood_score').value = log.mood_score;
+
+            // 改變 UI 狀態提示使用者正在進行修改
+            document.getElementById('formTitle').innerText = "✏️ 修改健康日誌";
+            document.getElementById('formTitle').className = "text-xl font-bold text-amber-400 mb-4";
+            document.getElementById('submitBtn').innerText = "確認修改並更新資料庫 (PUT)";
+            document.getElementById('submitBtn').className = "w-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 font-bold p-3 rounded-xl transition duration-200 hover:opacity-90 active:scale-95 text-sm cursor-pointer shadow-lg";
+            document.getElementById('cancelEditBtn').classList.remove('hidden');
+
+            updateLiveRisk();
+            // 滾動到表單位置方便操作 (手機板特別實用)
+            document.getElementById('logForm').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 重設表單回到新增狀態
+        function resetForm() {
+            document.getElementById('edit_id').value = '';
+            document.getElementById('log_date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('sleep_hours').value = '';
+            document.getElementById('steps').value = '';
+            document.getElementById('mood_score').value = '';
+            
+            document.getElementById('formTitle').innerText = "📝 記錄今日健康";
+            document.getElementById('formTitle').className = "text-xl font-bold text-cyan-400 mb-4";
+            document.getElementById('submitBtn').innerText = "儲存日誌並寫入資料庫";
+            document.getElementById('submitBtn').className = "w-full bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-900 font-bold p-3 rounded-xl transition duration-200 hover:opacity-90 active:scale-95 text-sm cursor-pointer shadow-lg shadow-cyan-500/10";
+            document.getElementById('cancelEditBtn').classList.add('hidden');
+            
+            document.getElementById('liveBadge').className = "w-full py-2 text-center rounded-xl font-bold text-sm bg-slate-700 text-slate-300";
+            document.getElementById('liveBadge').innerText = "請輸入數據...";
+        }
+
+        // 表單送出事件 (區分 新增POST 與 修改PUT)
+        document.getElementById('logForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const editId = document.getElementById('edit_id').value;
+            const log_date = document.getElementById('log_date').value;
+            const sleep_hours = document.getElementById('sleep_hours').value;
+            const steps = document.getElementById('steps').value;
+            const mood_score = document.getElementById('mood_score').value;
+
+            if (editId) {
+                // 🌟 【PUT 流程】：戳修改端點，使用 URL query 帶入參數以完美契合後端設計
+                const url = `/health-logs/${editId}?log_date=${log_date}&sleep_hours=${sleep_hours}&steps=${steps}&mood_score=${mood_score}`;
+                const res = await fetch(url, { method: 'PUT' });
+
+                if(res.ok) {
+                    resetForm();
+                    fetchLogs();
+                } else {
+                    alert('修改失敗！');
+                }
+            } else {
+                // 【POST 流程】：原本的新增日誌
+                const formData = new FormData();
+                formData.append('log_date', log_date);
+                formData.append('sleep_hours', sleep_hours);
+                formData.append('steps', steps);
+                formData.append('mood_score', mood_score);
+
+                const res = await fetch('/health-logs', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if(res.ok) {
+                    resetForm();
+                    fetchLogs();
+                } else {
+                    alert('儲存失敗！');
+                }
+            }
+        });
+
+        // 刪除日誌事件
+        async function deleteLog(id) {
+            if(confirm('確定要刪除此筆日誌嗎？')) {
+                const res = await fetch(`/health-logs/${id}`, { method: 'DELETE' });
+                if(res.ok) fetchLogs();
+            }
+        }
+
+        // 網頁載入時立刻抓取歷史資料
+        fetchLogs();
+    </script>
+</body>
+</html>
